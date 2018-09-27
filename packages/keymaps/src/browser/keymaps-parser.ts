@@ -58,7 +58,7 @@ export class KeymapsParser {
         const bindings = parser.parse(strippedContent, parsingErrors);
         if (parsingErrors && errors) {
             for (const error of parsingErrors) {
-                errors.push(`${parser.ParseErrorCode[error.error]} at ${error.offset} offset of ${error.length} length`);
+                errors.push(`Error code ${error.error} at ${error.offset} offset of ${error.length} length`);
             }
         }
         if (this.validate(bindings)) {
