@@ -18,6 +18,7 @@ import { interfaces, injectable, inject, Container } from 'inversify';
 import { MAIN_RPC_CONTEXT, TreeViewsMain, TreeViewsExt } from '../../../api/plugin-api';
 import { RPCProtocol } from '@theia/plugin-ext/src/api/rpc-protocol';
 import { ViewRegistry } from './view-registry';
+import { Message } from '@phosphor/messaging';
 
 import {
     TreeWidget,
@@ -63,8 +64,8 @@ export class TreeViewsMainImpl implements TreeViewsMain {
         this.dataProviders.set(treeViewId, dataProvider);
 
         const treeViewContainer = this.createTreeViewContainer(dataProvider);
-
         const treeViewWidget = treeViewContainer.get(TreeViewWidget);
+
         this.treeViewWidgets.set(treeViewId, treeViewWidget);
 
         this.viewRegistry.onRegisterTreeView(treeViewId, treeViewWidget);
@@ -73,7 +74,7 @@ export class TreeViewsMainImpl implements TreeViewsMain {
     $refresh(treeViewId: string): void {
         const treeViewWidget = this.treeViewWidgets.get(treeViewId);
         if (treeViewWidget) {
-            treeViewWidget.upup();
+            treeViewWidget.model.refresh();
         }
     }
 
@@ -178,14 +179,19 @@ export class TreeViewWidget extends TreeWidget {
         @inject(TreeViewDataProviderMain) readonly dataProvider: TreeViewDataProviderMain) {
 
         super(treeProps, model, contextMenuRenderer);
+    }
+
+    protected onAfterAttach(msg: Message): void {
+        super.onAfterAttach(msg);
 
         setTimeout(() => {
             this.showDummyNode();
         }, 1000);
     }
 
-    public up() {
+    public updateWidget() {
         this.updateRows();
+        // this.updateDecorations();
 
         // Need to wait for 20 miliseconds until rows become updated.
         setTimeout(() => {
