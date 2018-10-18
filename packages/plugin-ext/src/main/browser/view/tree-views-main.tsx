@@ -185,8 +185,19 @@ export class TreeViewWidget extends TreeWidget {
         super.onAfterAttach(msg);
 
         setTimeout(() => {
-            this.showDummyNode();
-        }, 1000);
+            // Set root node
+            const node = {
+                id: '',
+                parent: undefined,
+                name: '',
+                visible: false,
+                expanded: true,
+                selected: false,
+                children: []
+            };
+
+            this.model.root = node;
+        });
     }
 
     public updateWidget() {
@@ -197,21 +208,6 @@ export class TreeViewWidget extends TreeWidget {
         setTimeout(() => {
             ReactDOM.render(<React.Fragment>{this.render()}</React.Fragment>, this.node, () => this.onRender.dispose());
         }, 20);
-    }
-
-    showDummyNode() {
-        const node = {
-            id: 'root-item',
-            parent: undefined,
-            name: 'IDE2 Team',
-            description: 'IDE2 Team Participants',
-            visible: true,
-            expanded: true,
-            selected: false,
-            children: []
-        };
-
-        this.model.root = node;
     }
 
     renderIcon(node: TreeNode, props: NodeProps): React.ReactNode {
@@ -234,9 +230,7 @@ export class PluginTree extends TreeImpl {
     }
 
     protected async resolveChildren(parent: CompositeTreeNode): Promise<TreeNode[]> {
-        const children = await this.dataProvider.resolveChildren(parent.id);
-        return children;
-
+        return await this.dataProvider.resolveChildren(parent.id);
     }
 
 }
