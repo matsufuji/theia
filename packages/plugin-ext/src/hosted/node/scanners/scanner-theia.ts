@@ -32,7 +32,9 @@ import {
     ViewContainer,
     PluginPackageViewContainer,
     View,
-    PluginPackageView
+    PluginPackageView,
+    Menu,
+    PluginPackageMenu
 } from '../../../common/plugin-protocol';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -82,12 +84,17 @@ export class TheiaPluginScanner implements PluginScanner {
         };
     }
 
-    private readContributions(rawPlugin: PluginPackage): PluginContribution | undefined {
+    protected readContributions(rawPlugin: PluginPackage): PluginContribution | undefined {
         if (!rawPlugin.contributes) {
             return undefined;
         }
 
         const contributions: PluginContribution = {};
+        if (rawPlugin.contributes!.configuration) {
+            const config = this.readConfiguration(rawPlugin.contributes.configuration!, rawPlugin.packagePath);
+            contributions.configuration = config;
+        }
+
         if (rawPlugin.contributes!.languages) {
             const languages = this.readLanguages(rawPlugin.contributes.languages!, rawPlugin.packagePath);
             contributions.languages = languages;
@@ -124,7 +131,24 @@ export class TheiaPluginScanner implements PluginScanner {
             });
         }
 
+        if (rawPlugin.contributes!.menus) {
+            contributions.menus = {};
+
+            Object.keys(rawPlugin.contributes.menus!).forEach(location => {
+                const menus = this.readMenus(rawPlugin.contributes!.menus![location]);
+                contributions.menus![location] = menus;
+            });
+        }
+
         return contributions;
+    }
+
+    private readConfiguration(rawConfiguration: any, pluginPath: string): any {
+        return {
+            type: rawConfiguration.type,
+            title: rawConfiguration.title,
+            properties: rawConfiguration.properties
+        };
     }
 
     private readViewsContainers(rawViewsContainers: PluginPackageViewContainer[], pluginPath: string): ViewContainer[] {
@@ -151,6 +175,18 @@ export class TheiaPluginScanner implements PluginScanner {
             name: rawView.name
         };
 
+        return result;
+    }
+
+    private readMenus(rawMenus: PluginPackageMenu[]): Menu[] {
+        return rawMenus.map(rawMenu => this.readMenu(rawMenu));
+    }
+
+    private readMenu(rawMenu: PluginPackageMenu): Menu {
+        const result: Menu = {
+            command: rawMenu.command,
+            group: rawMenu.group
+        };
         return result;
     }
 

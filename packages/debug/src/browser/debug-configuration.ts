@@ -19,8 +19,9 @@ import { FileSystem, FileStat } from '@theia/filesystem/lib/common';
 import { WorkspaceService } from '@theia/workspace/lib/browser/workspace-service';
 import URI from '@theia/core/lib/common/uri';
 import { QuickPickService, OpenerService, open } from '@theia/core/lib/browser';
-import { DebugService, DebugConfiguration } from '../common/debug-common';
+import { DebugService, DebugConfiguration, LaunchConfig } from '../common/debug-common';
 import { VariableResolverService } from '@theia/variable-resolver/lib/browser';
+import * as jsoncparser from 'jsonc-parser';
 
 @injectable()
 export class DebugConfigurationManager {
@@ -61,7 +62,7 @@ export class DebugConfigurationManager {
             return;
         }
         const configurations = await this.readConfigurations();
-        configurations.concat(newDebugConfiguration);
+        configurations.push(newDebugConfiguration);
         await this.writeConfigurations(configurations);
         this.openConfigurationFile();
     }
@@ -81,57 +82,58 @@ export class DebugConfigurationManager {
         return resolvedConfiguration && this.variableResolver.resolve(resolvedConfiguration);
     }
 
-    readConfigurations(): Promise<DebugConfiguration[]> {
-        return this.resolveConfigurationFile()
-            .then(configFile => this.fileSystem.resolveContent(configFile.uri))
-            .then(({ stat, content }) => {
-                if (content.length === 0) {
-                    return [];
-                }
-
-                try {
-                    // TODO use jsonc-parser instead
-                    return JSON.parse(content);
-                } catch (error) {
-                    return Promise.reject('Configuration file bad format.');
-                }
-            });
+    async readConfigurations(): Promise<DebugConfiguration[]> {
+        const configFile = await this.internalReadConfig();
+        return configFile.configurations;
     }
 
-    writeConfigurations(configurations: DebugConfiguration[]): Promise<void> {
-        return this.resolveConfigurationFile()
-            .then(configFile => {
-                // TODO use jsonc-parser instead
-                const jsonPretty = JSON.stringify(configurations, (key, value) => value, 2);
-                return this.fileSystem.setContent(configFile, jsonPretty);
-            })
-            .then(() => { });
+    protected async internalReadConfig(): Promise<LaunchConfig> {
+        const configFile = await this.resolveConfigurationFile();
+        const { content } = await this.fileSystem.resolveContent(configFile.uri);
+        if (content.length === 0) {
+            return {
+                version: '0.2.0',
+                configurations: []
+            };
+        }
+        try {
+            return jsoncparser.parse(content);
+        } catch (error) {
+            throw new Error('Configuration file bad format.');
+        }
+    }
+
+    async writeConfigurations(configurations: DebugConfiguration[]): Promise<void> {
+        const config = await this.internalReadConfig();
+        config.configurations = configurations;
+        // TODO use jsonc-parser instead
+        const jsonPretty = JSON.stringify(config, (key, value) => value, 2);
+        const configFile = await this.resolveConfigurationFile();
+        await this.fileSystem.setContent(configFile, jsonPretty);
     }
 
     /**
      * Creates and returns configuration file.
      * @returns [configuration file](#FileStat).
      */
-    protected resolveConfigurationFile(): Promise<FileStat> {
+    protected async resolveConfigurationFile(): Promise<FileStat> {
         const root = this.workspaceService.tryGetRoots()[0];
         if (!root) {
-            return Promise.reject('Workspace is not opened yet.');
+            throw new Error('Workspace is not opened yet.');
         }
-
         const uri = root.uri + '/' + DebugConfigurationManager.CONFIG;
-        return this.fileSystem.exists(uri)
+        const configFile = await this.fileSystem.exists(uri)
             .then(exists => {
                 if (exists) {
                     return this.fileSystem.getFileStat(uri);
                 } else {
                     return this.fileSystem.createFile(uri, { encoding: 'utf8' });
                 }
-            }).then(configFile => {
-                if (configFile) {
-                    return Promise.resolve(configFile);
-                }
-                return Promise.reject(`Configuration file '${DebugConfigurationManager.CONFIG}' not found.`);
             });
+        if (!configFile) {
+            throw new Error(`Configuration file '${DebugConfigurationManager.CONFIG}' not found.`);
+        }
+        return configFile;
     }
 
     protected async selectDebugType(): Promise<string | undefined> {

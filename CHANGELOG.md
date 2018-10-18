@@ -1,5 +1,20 @@
 # Change Log
 
+## v0.3.16
+- [plug-in] added `DocumentLinkProvider` Plug-in API
+
+
+## v0.3.15
+- [plug-in] added `menus` contribution point
+- [cpp] Add debugging for C/C++ programs
+- View Keybindings Widget - used to view and search keybindings 
+- multi-root workspace support, vsCode compatibility
+- Add TCL grammar file
+- [debug] resolve variables in configurations
+- Add debug toolbar
+- Make Debug Session Views Act like Panels
+
+
 ## v0.3.13
 - [cpp] Add a status bar button to select an active cpp build configuration
 - Recently opened workspaces history 

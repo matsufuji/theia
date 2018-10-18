@@ -22,7 +22,7 @@
 // Some entities copied and modified from https://github.com/Microsoft/vscode-debugadapter-node/blob/master/adapter/src/protocol.ts
 
 import * as net from 'net';
-import { injectable, inject } from 'inversify';
+import { injectable, inject, named } from 'inversify';
 import { ILogger, DisposableCollection, Disposable } from '@theia/core';
 import {
     DebugSessionState,
@@ -75,7 +75,7 @@ export class LaunchBasedDebugAdapterFactory implements DebugAdapterFactory {
             ? [executable.program].concat(executable.args ? executable.args : [])
             : executable.args;
 
-        return this.processFactory({ command: command, args: args });
+        return this.processFactory({ command: command, args: args, options: { stdio: ['pipe', 'pipe', 2] } });
     }
 
     connect(debugServerPort: number): CommunicationProvider {
@@ -168,6 +168,8 @@ export class DebugAdapterSessionImpl extends EventEmitter implements DebugAdapte
                             this.proceedEvent(rawData, message as DebugProtocol.Event);
                         } else if (message.type === 'response') {
                             this.proceedResponse(rawData, message as DebugProtocol.Response);
+                        } else if (this.channel) {
+                            this.channel.send(rawData);
                         }
                     }
                     continue;	// there may be more complete messages to process
@@ -265,6 +267,24 @@ export class DebugAdapterSessionImpl extends EventEmitter implements DebugAdapte
                     break;
                 }
 
+                case 'loadedSources': {
+                    const loadedSourcesResponse = response as DebugProtocol.LoadedSourcesResponse;
+
+                    for (const source of loadedSourcesResponse.body.sources) {
+                        const event: DebugProtocol.LoadedSourceEvent = {
+                            type: 'event',
+                            seq: -1,
+                            event: 'loadedSource',
+                            body: {
+                                source,
+                                reason: 'new'
+                            }
+                        };
+                        this.proceedEvent(JSON.stringify(event), event);
+                    }
+                    break;
+                }
+
                 case 'initialized': {
                     const initializeResponse = response as DebugProtocol.InitializeResponse;
                     const event: DebugProtocol.CapabilitiesEvent = {
@@ -301,8 +321,7 @@ export class DebugAdapterSessionImpl extends EventEmitter implements DebugAdapte
 @injectable()
 export class DebugAdapterSessionFactoryImpl implements DebugAdapterSessionFactory {
 
-    @inject(ILogger)
-    protected readonly logger: ILogger;
+    @inject(ILogger) @named('debug') protected readonly logger: ILogger;
 
     get(sessionId: string, communicationProvider: CommunicationProvider): DebugAdapterSession {
         return new DebugAdapterSessionImpl(

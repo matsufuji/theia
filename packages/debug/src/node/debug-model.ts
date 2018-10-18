@@ -26,6 +26,7 @@ import { Disposable } from '@theia/core';
 import * as stream from 'stream';
 import { WebSocketChannel } from '@theia/core/lib/common/messaging/web-socket-channel';
 import { DebugConfiguration, DebugSessionState } from '../common/debug-common';
+import { IJSONSchema } from '@theia/core/lib/common/json-schema';
 
 /**
  * DebugAdapterSession symbol for DI.
@@ -121,12 +122,17 @@ export interface DebugAdapterContribution {
     provideDebugConfigurations: DebugConfiguration[];
 
     /**
+     * @returns The contributed configuration schema for this debug type.
+     */
+    getSchemaAttributes(): Promise<IJSONSchema[]>;
+
+    /**
      * Resolves a [debug configuration](#DebugConfiguration) by filling in missing values
      * or by adding/changing/removing attributes.
      * @param config The [debug configuration](#DebugConfiguration) to resolve.
      * @returns The resolved debug configuration.
      */
-    resolveDebugConfiguration(config: DebugConfiguration): DebugConfiguration;
+    resolveDebugConfiguration(config: DebugConfiguration): Promise<DebugConfiguration>;
 
     /**
      * Provides a [debug adapter executable](#DebugAdapterExecutable)
@@ -135,5 +141,5 @@ export interface DebugAdapterContribution {
      * @param config The resolved [debug configuration](#DebugConfiguration).
      * @returns The [debug adapter executable](#DebugAdapterExecutable).
      */
-    provideDebugAdapterExecutable(config: DebugConfiguration): DebugAdapterExecutable;
+    provideDebugAdapterExecutable(config: DebugConfiguration): Promise<DebugAdapterExecutable>;
 }

@@ -15,10 +15,13 @@
  ********************************************************************************/
 
 import { injectable, inject } from 'inversify';
-import { PluginContribution, IndentationRules, FoldingRules, ScopeMap } from '../../common';
-import { TextmateRegistry, getEncodedLanguageId } from '@theia/monaco/lib/browser/textmate';
 import { ITokenTypeMap, IEmbeddedLanguagesMap, StandardTokenType } from 'vscode-textmate';
+import { TextmateRegistry, getEncodedLanguageId } from '@theia/monaco/lib/browser/textmate';
+import { MenusContributionPointHandler } from './menus/menus-contribution-handler';
 import { ViewRegistry } from './view/view-registry';
+import { PluginContribution, IndentationRules, FoldingRules, ScopeMap } from '../../common';
+import { PreferenceSchemaProvider } from '@theia/core/lib/browser';
+import { PreferenceSchema } from '@theia/core/lib/browser/preferences';
 
 @injectable()
 export class PluginContributionHandler {
@@ -31,7 +34,17 @@ export class PluginContributionHandler {
     @inject(ViewRegistry)
     private readonly viewRegistry: ViewRegistry;
 
+    @inject(MenusContributionPointHandler)
+    private readonly menusContributionHandler: MenusContributionPointHandler;
+
+    @inject(PreferenceSchemaProvider)
+    private readonly preferenceSchemaProvider: PreferenceSchemaProvider;
+
     handleContributions(contributions: PluginContribution): void {
+        if (contributions.configuration) {
+            this.updateConfigurationSchema(contributions.configuration);
+        }
+
         if (contributions.languages) {
             for (const lang of contributions.languages) {
                 monaco.languages.register({
@@ -107,6 +120,12 @@ export class PluginContributionHandler {
                 }
             }
         }
+
+        this.menusContributionHandler.handle(contributions);
+    }
+
+    private updateConfigurationSchema(schema: PreferenceSchema): void {
+        this.preferenceSchemaProvider.setSchema(schema);
     }
 
     private createRegex(value: string | undefined): RegExp | undefined {

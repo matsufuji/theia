@@ -71,6 +71,10 @@ export namespace WorkspaceCommands {
         id: 'file.delete',
         label: 'Delete'
     };
+    export const FILE_DUPLICATE: Command = {
+        id: 'file.duplicate',
+        label: 'Duplicate'
+    };
     export const FILE_COMPARE: Command = {
         id: 'file.compare',
         label: 'Compare with Each Other'
@@ -192,9 +196,28 @@ export class WorkspaceCommandContribution implements CommandContribution {
                 }
             })
         }));
+        registry.registerCommand(WorkspaceCommands.FILE_DUPLICATE, this.newMultiUriAwareCommandHandler({
+            execute: async uris => {
+                await Promise.all(uris.map(async uri => {
+                    const parent = await this.getParent(uri);
+                    if (parent) {
+                        const parentUri = new URI(parent.uri);
+                        const name = uri.path.name + '_copy';
+                        const ext = uri.path.ext;
+                        const target = this.findVacantChildUri(parentUri, parent, name, ext);
+                        try {
+                            this.fileSystem.copy(uri.toString(), target.toString());
+                        } catch (e) {
+                            console.error(e);
+                        }
+                    }
+                }));
+            }
+        }));
         registry.registerCommand(WorkspaceCommands.FILE_DELETE, this.newMultiUriAwareCommandHandler(this.deleteHandler));
         registry.registerCommand(WorkspaceCommands.FILE_COMPARE, this.newMultiUriAwareCommandHandler({
             isVisible: uris => uris.length === 2,
+            isEnabled: uris => uris.length === 2,
             execute: async uris => {
                 const [left, right] = uris;
                 const [leftExists, rightExists] = await Promise.all([

@@ -15,7 +15,7 @@
  ********************************************************************************/
 import { injectable, inject, interfaces } from 'inversify';
 import { PluginWorker } from '../../main/browser/plugin-worker';
-import { HostedPluginServer, PluginMetadata } from '../../common/plugin-protocol';
+import { HostedPluginServer, PluginMetadata, getPluginId } from '../../common/plugin-protocol';
 import { HostedPluginWatcher } from './hosted-plugin-watcher';
 import { MAIN_RPC_CONTEXT } from '../../api/plugin-api';
 import { setUpPluginApi } from '../../main/browser/main-context';
@@ -23,11 +23,11 @@ import { RPCProtocol, RPCProtocolImpl } from '../../api/rpc-protocol';
 import { ILogger } from '@theia/core';
 import { PreferenceServiceImpl } from '@theia/core/lib/browser';
 import { PluginContributionHandler } from '../../main/browser/plugin-contribution-handler';
+import { getQueryParameters } from '../../main/browser/env-main';
 
 @injectable()
 export class HostedPluginSupport {
     container: interfaces.Container;
-    private worker: PluginWorker;
 
     @inject(ILogger)
     protected readonly logger: ILogger;
@@ -64,25 +64,26 @@ export class HostedPluginSupport {
         });
 
     }
-
     loadPlugins(pluginsMetadata: PluginMetadata[], container: interfaces.Container): void {
         const [frontend, backend] = this.initContributions(pluginsMetadata);
         this.theiaReadyPromise.then(() => {
             if (frontend) {
-                this.worker = new PluginWorker();
-                const hostedExtManager = this.worker.rpc.getProxy(MAIN_RPC_CONTEXT.HOSTED_PLUGIN_MANAGER_EXT);
-                hostedExtManager.$init({ plugins: pluginsMetadata });
-                setUpPluginApi(this.worker.rpc, container);
+                const worker = new PluginWorker();
+                const hostedExtManager = worker.rpc.getProxy(MAIN_RPC_CONTEXT.HOSTED_PLUGIN_MANAGER_EXT);
+                hostedExtManager.$init({ plugins: pluginsMetadata, preferences: this.preferenceServiceImpl.getPreferences(), env: { queryParams: getQueryParameters() } });
+                setUpPluginApi(worker.rpc, container);
             }
 
             if (backend) {
-                const rpc = this.createServerRpc();
-                const hostedExtManager = rpc.getProxy(MAIN_RPC_CONTEXT.HOSTED_PLUGIN_MANAGER_EXT);
-                hostedExtManager.$init({ plugins: pluginsMetadata });
-                setUpPluginApi(rpc, container);
+                // create one RPC per plugin to be able so remote plug-ins can be in different context
+                pluginsMetadata.forEach(pluginMetadata => {
+                    const rpc = this.createServerRpc(pluginMetadata);
+                    const hostedExtManager = rpc.getProxy(MAIN_RPC_CONTEXT.HOSTED_PLUGIN_MANAGER_EXT);
+                    hostedExtManager.$init({ plugins: [pluginMetadata], preferences: this.preferenceServiceImpl.getPreferences(), env: { queryParams: getQueryParameters() } });
+                    setUpPluginApi(rpc, container);
+                });
             }
         });
-
     }
 
     private initContributions(pluginsMetadata: PluginMetadata[]): [boolean, boolean] {
@@ -104,10 +105,16 @@ export class HostedPluginSupport {
         return result;
     }
 
-    private createServerRpc(): RPCProtocol {
+    private createServerRpc(pluginMetadata: PluginMetadata): RPCProtocol {
         return new RPCProtocolImpl({
             onMessage: this.watcher.onPostMessageEvent,
-            send: message => { this.server.onMessage(JSON.stringify(message)); }
+            send: message => {
+                const pluginID = getPluginId(pluginMetadata.model);
+                const wrappedMessage: any = {};
+                wrappedMessage['pluginID'] = pluginID;
+                wrappedMessage['content'] = message;
+                this.server.onMessage(JSON.stringify(wrappedMessage));
+            }
         });
     }
 }

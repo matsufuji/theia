@@ -55,6 +55,11 @@ export namespace Keybinding {
         const keyCodesString = keybinding.keybinding.split(' ');
         return KeySequence.acceleratorFor(keyCodesString.map(k => KeyCode.parse(k)), separator);
     }
+
+    /* Determine whether object is a KeyBinding */
+    export function is(arg: Keybinding | any): arg is Keybinding {
+        return !!arg && arg === Object(arg) && 'command' in arg && 'keybinding' in arg;
+    }
 }
 
 export interface Keybinding {
@@ -165,6 +170,31 @@ export class KeybindingRegistry {
         this.doRegisterKeybindings(bindings, KeybindingScope.DEFAULT);
     }
 
+    /**
+     * Unregister keybinding from the registry
+     *
+     * @param binding
+     */
+    unregisterKeybinding(binding: Keybinding): void;
+    /**
+     * Unregister keybinding from the registry
+     *
+     * @param key
+     */
+    unregisterKeybinding(key: string): void;
+    unregisterKeybinding(keyOrBinding: Keybinding | string): void {
+        const key = Keybinding.is(keyOrBinding) ? keyOrBinding.keybinding : keyOrBinding;
+        const keymap = this.keymaps[KeybindingScope.DEFAULT];
+        const bindings = keymap.filter(el => el.keybinding === key);
+
+        bindings.forEach(binding => {
+            const idx = keymap.indexOf(binding);
+            if (idx >= 0) {
+                keymap.splice(idx, 1);
+            }
+        });
+    }
+
     protected doRegisterKeybindings(bindings: Keybinding[], scope: KeybindingScope = KeybindingScope.DEFAULT) {
         for (const binding of bindings) {
             this.doRegisterKeybinding(binding, scope);
@@ -173,7 +203,7 @@ export class KeybindingRegistry {
 
     protected doRegisterKeybinding(binding: Keybinding, scope: KeybindingScope = KeybindingScope.DEFAULT) {
         try {
-            if (!this.containsKeybinding(this.keymaps[scope], binding)) {
+            if (this.containsKeybinding(this.keymaps[scope], binding)) {
                 throw new Error(`"${binding.keybinding}" is in collision with something else [scope:${scope}]`);
             }
             this.keymaps[scope].push(binding);
@@ -197,21 +227,25 @@ export class KeybindingRegistry {
             this.logger.warn('Collided keybinding is ignored; ',
                 Keybinding.stringify(binding), ' collided with ',
                 collisions.full.map(b => Keybinding.stringify(b)).join(', '));
-            return false;
+            return true;
         }
         if (collisions.partial.length > 0) {
             this.logger.warn('Shadowing keybinding is ignored; ',
                 Keybinding.stringify(binding), ' shadows ',
                 collisions.partial.map(b => Keybinding.stringify(b)).join(', '));
-            return false;
+            return true;
         }
         if (collisions.shadow.length > 0) {
             this.logger.warn('Shadowed keybinding is ignored; ',
                 Keybinding.stringify(binding), ' would be shadowed by ',
                 collisions.shadow.map(b => Keybinding.stringify(b)).join(', '));
-            return false;
+            return true;
         }
-        return true;
+        return false;
+    }
+
+    containsKeybindingInScope(binding: Keybinding, scope = KeybindingScope.USER): boolean {
+        return this.containsKeybinding(this.keymaps[scope], binding);
     }
 
     /**

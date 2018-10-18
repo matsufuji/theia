@@ -25,6 +25,7 @@ import {
 import { UUID } from '@phosphor/coreutils';
 import { DebugAdapterContribution, DebugAdapterExecutable, DebugAdapterSession, DebugAdapterSessionFactory, DebugAdapterFactory } from './debug-model';
 import { MessagingService } from '@theia/core/lib/node';
+import { IJSONSchema } from '@theia/core/src/common/json-schema';
 
 /**
  * Contributions registry.
@@ -55,10 +56,23 @@ export class DebugAdapterContributionRegistry {
      * @param debugType The registered debug type
      * @returns An array of [debug configurations](#DebugConfiguration)
      */
-    provideDebugConfigurations(debugType: string): DebugConfiguration[] {
+    async provideDebugConfigurations(debugType: string): Promise<DebugConfiguration[]> {
         const contrib = this.contribs.get(debugType);
         if (contrib) {
             return contrib.provideDebugConfigurations;
+        }
+        throw new Error(`Debug adapter '${debugType}' isn't registered.`);
+    }
+
+    /**
+     * Provides schema attributes.
+     * @param debugType The registered debug type
+     * @returns Schema attributes for the given debug type
+     */
+    getSchemaAttributes(debugType: string): Promise<IJSONSchema[]> {
+        const contrib = this.contribs.get(debugType);
+        if (contrib) {
+            return contrib.getSchemaAttributes();
         }
         throw new Error(`Debug adapter '${debugType}' isn't registered.`);
     }
@@ -69,7 +83,7 @@ export class DebugAdapterContributionRegistry {
      * @param debugConfiguration The [debug configuration](#DebugConfiguration) to resolve.
      * @returns The resolved debug configuration.
      */
-    resolveDebugConfiguration(config: DebugConfiguration): DebugConfiguration {
+    async resolveDebugConfiguration(config: DebugConfiguration): Promise<DebugConfiguration> {
         const contrib = this.contribs.get(config.type);
         if (contrib) {
             return contrib.resolveDebugConfiguration(config);
@@ -83,7 +97,7 @@ export class DebugAdapterContributionRegistry {
      * @param config The resolved [debug configuration](#DebugConfiguration).
      * @returns The [debug adapter executable](#DebugAdapterExecutable).
      */
-    provideDebugAdapterExecutable(config: DebugConfiguration): DebugAdapterExecutable {
+    async provideDebugAdapterExecutable(config: DebugConfiguration): Promise<DebugAdapterExecutable> {
         const contrib = this.contribs.get(config.type);
         if (contrib) {
             return contrib.provideDebugAdapterExecutable(config);
@@ -125,14 +139,14 @@ export class DebugAdapterSessionManager {
      * @param config The [DebugConfiguration](#DebugConfiguration)
      * @returns The debug adapter session
      */
-    create(config: DebugConfiguration): DebugAdapterSession {
+    async create(config: DebugConfiguration): Promise<DebugAdapterSession> {
         const sessionId = UUID.uuid4();
 
         let communicationProvider;
         if ('debugServer' in config) {
             communicationProvider = this.debugAdapterFactory.connect(config.debugServer);
         } else {
-            const executable = this.registry.provideDebugAdapterExecutable(config);
+            const executable = await this.registry.provideDebugAdapterExecutable(config);
             communicationProvider = this.debugAdapterFactory.start(executable);
         }
 
@@ -202,15 +216,19 @@ export class DebugServiceImpl implements DebugService, MessagingService.Contribu
     }
 
     async provideDebugConfigurations(debugType: string): Promise<DebugConfiguration[]> {
-        return this.registry.provideDebugConfigurations(debugType);
+        return await this.registry.provideDebugConfigurations(debugType);
+    }
+
+    getSchemaAttributes(debugType: string): Promise<IJSONSchema[]> {
+        return this.registry.getSchemaAttributes(debugType);
     }
 
     async resolveDebugConfiguration(config: DebugConfiguration): Promise<DebugConfiguration> {
-        return this.registry.resolveDebugConfiguration(config);
+        return await this.registry.resolveDebugConfiguration(config);
     }
 
     async create(config: DebugConfiguration): Promise<string> {
-        const session = this.sessionManager.create(config);
+        const session = await this.sessionManager.create(config);
         return session.id;
     }
 

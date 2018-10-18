@@ -15,8 +15,37 @@
  ********************************************************************************/
 
 import { DebugConfiguration, DebugSessionState } from '../common/debug-common';
-import { Disposable } from '@theia/core';
+import { Event, Disposable } from '@theia/core';
 import { DebugProtocol } from 'vscode-debugprotocol';
+
+/**
+ * Stack frame format.
+ */
+export const DEFAULT_STACK_FRAME_FORMAT: DebugProtocol.StackFrameFormat = {
+    parameters: true,
+    parameterTypes: true,
+    parameterNames: true,
+    parameterValues: true,
+    line: true,
+    module: true,
+    includeAll: true,
+    hex: false
+};
+
+/**
+ * Initialize requests arguments.
+ */
+export const INITIALIZE_ARGUMENTS = {
+    clientID: 'Theia',
+    clientName: 'Theia IDE',
+    locale: 'en-US',
+    linesStartAt1: true,
+    columnsStartAt1: true,
+    pathFormat: 'path',
+    supportsVariableType: false,
+    supportsVariablePaging: false,
+    supportsRunInTerminalRequest: true
+};
 
 /**
  * DebugSession symbol for DI.
@@ -26,10 +55,12 @@ export const DebugSession = Symbol('DebugSession');
 /**
  * The debug session.
  */
+// FIXME get rid of NodeJS.EventEmitter, replace with core events
 export interface DebugSession extends Disposable, NodeJS.EventEmitter {
     readonly sessionId: string;
     readonly configuration: DebugConfiguration;
     readonly state: DebugSessionState;
+    readonly onDidOutput: Event<DebugProtocol.OutputEvent>;
 
     initialize(args: DebugProtocol.InitializeRequestArguments): Promise<DebugProtocol.InitializeResponse>;
     configurationDone(): Promise<DebugProtocol.ConfigurationDoneResponse>;
@@ -51,6 +82,8 @@ export interface DebugSession extends Disposable, NodeJS.EventEmitter {
     next(args: DebugProtocol.NextArguments): Promise<DebugProtocol.NextResponse>;
     stepIn(args: DebugProtocol.StepInArguments): Promise<DebugProtocol.StepInResponse>;
     stepOut(args: DebugProtocol.StepOutArguments): Promise<DebugProtocol.StepOutResponse>;
+    loadedSources(args: DebugProtocol.LoadedSourcesArguments): Promise<DebugProtocol.LoadedSourcesResponse>;
+    completions(args: DebugProtocol.CompletionsArguments): Promise<DebugProtocol.CompletionsResponse>;
 }
 
 /**

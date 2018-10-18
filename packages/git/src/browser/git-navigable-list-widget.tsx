@@ -23,6 +23,7 @@ import { Message } from '@phosphor/messaging';
 import { ElementExt } from '@phosphor/domutils';
 import { inject, injectable } from 'inversify';
 import { ReactWidget } from '@theia/core/lib/browser/widgets/react-widget';
+import * as React from 'react';
 
 @injectable()
 export abstract class GitNavigableListWidget<T extends { selected?: boolean }> extends ReactWidget {
@@ -40,6 +41,7 @@ export abstract class GitNavigableListWidget<T extends { selected?: boolean }> e
 
     protected onActivateRequest(msg: Message): void {
         super.onActivateRequest(msg);
+        this.update();
         this.node.focus();
     }
 
@@ -74,12 +76,18 @@ export abstract class GitNavigableListWidget<T extends { selected?: boolean }> e
 
     protected relativePath(uri: URI | string): string {
         const parsedUri = typeof uri === 'string' ? new URI(uri) : uri;
-        const repo = this.repositoryProvider.selectedRepository;
+        const repo = this.repositoryProvider.findRepository(parsedUri);
         if (repo) {
             return Repository.relativePath(repo, parsedUri).toString();
         } else {
             return this.labelProvider.getLongName(parsedUri);
         }
+    }
+
+    protected getRepositoryLabel(uri: string): string | undefined {
+        const repository = this.repositoryProvider.findRepository(new URI(uri));
+        const isSelectedRepo = this.repositoryProvider.selectedRepository && repository && this.repositoryProvider.selectedRepository.localUri === repository.localUri;
+        return repository && !isSelectedRepo ? this.labelProvider.getLongName(new URI(repository.localUri)) : undefined;
     }
 
     protected computeCaption(fileChange: GitFileChange): string {
@@ -90,13 +98,23 @@ export abstract class GitNavigableListWidget<T extends { selected?: boolean }> e
         return result;
     }
 
-    protected onAfterAttach(msg: Message): void {
-        super.onAfterAttach(msg);
-        this.addKeyListener(this.node, Key.ARROW_LEFT, () => this.navigateLeft());
-        this.addKeyListener(this.node, Key.ARROW_RIGHT, () => this.navigateRight());
-        this.addKeyListener(this.node, Key.ARROW_UP, () => this.navigateUp());
-        this.addKeyListener(this.node, Key.ARROW_DOWN, () => this.navigateDown());
-        this.addKeyListener(this.node, Key.ENTER, () => this.handleListEnter());
+    protected renderHeaderRow({ name, value, classNames }: { name: string, value: React.ReactNode, classNames?: string[] }): React.ReactNode {
+        if (!value) {
+            return;
+        }
+        const className = ['header-row', ...(classNames || [])].join(' ');
+        return <div key={name} className={className}>
+            <div className='theia-header'>{name}</div>
+            <div className='header-value'>{value}</div>
+        </div>;
+    }
+
+    protected addGitListNavigationKeyListeners(container: HTMLElement) {
+        this.addKeyListener(container, Key.ARROW_LEFT, () => this.navigateLeft());
+        this.addKeyListener(container, Key.ARROW_RIGHT, () => this.navigateRight());
+        this.addKeyListener(container, Key.ARROW_UP, () => this.navigateUp());
+        this.addKeyListener(container, Key.ARROW_DOWN, () => this.navigateDown());
+        this.addKeyListener(container, Key.ENTER, () => this.handleListEnter());
     }
 
     protected navigateLeft(): void {

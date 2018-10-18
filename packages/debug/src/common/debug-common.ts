@@ -24,6 +24,7 @@
 
 import { Disposable } from '@theia/core';
 import { DebugProtocol } from 'vscode-debugprotocol';
+import { IJSONSchema } from '@theia/core/lib/common/json-schema';
 
 /**
  * The WS endpoint path to the Debug service.
@@ -59,6 +60,13 @@ export interface DebugService extends Disposable {
     provideDebugConfigurations(debugType: string): Promise<DebugConfiguration[]>;
 
     /**
+     * Provides the schema attributes.
+     * @param debugType The registered debug type
+     * @returns An JSON Schema describing the configuration attributes for the given debug type
+     */
+    getSchemaAttributes(debugType: string): Promise<IJSONSchema[]>;
+
+    /**
      * Resolves a [debug configuration](#DebugConfiguration) by filling in missing values
      * or by adding/changing/removing attributes.
      * @param debugConfiguration The [debug configuration](#DebugConfiguration) to resolve.
@@ -82,6 +90,11 @@ export interface DebugService extends Disposable {
      * Stop all running sessions.
      */
     stop(): Promise<void>;
+}
+
+export interface LaunchConfig {
+    version: string;
+    configurations: DebugConfiguration[];
 }
 
 /**
@@ -117,6 +130,11 @@ export interface DebugSessionState {
      * Indicates if debug session is connected to the debug adapter.
      */
     isConnected: boolean;
+
+    /**
+     * Indicates if debug session is terminated.
+     */
+    isTerminated: boolean;
 
     /**
      * Indicates if all threads are continued.
@@ -226,6 +244,7 @@ export namespace ExtDebugProtocol {
  */
 export class DebugSessionStateAccumulator implements DebugSessionState {
     isConnected: boolean;
+    isTerminated: boolean;
     allThreadsContinued: boolean | undefined;
     allThreadsStopped: boolean | undefined;
     stoppedThreadIds = new Set<number>();
@@ -255,7 +274,7 @@ export class DebugSessionStateAccumulator implements DebugSessionState {
     }
 
     private onTerminated(event: DebugProtocol.TerminatedEvent): void {
-        this.isConnected = false;
+        this.isTerminated = true;
     }
 
     private onContinued(event: DebugProtocol.ContinuedEvent): void {
