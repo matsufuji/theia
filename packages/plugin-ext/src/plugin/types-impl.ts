@@ -953,7 +953,7 @@ export class TreeItem {
 
     command?: theia.Command;
 
-    // collapsibleState?: TreeItemCollapsibleState;
+    collapsibleState?: TreeItemCollapsibleState;
 
     contextValue?: string;
 
