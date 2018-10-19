@@ -313,7 +313,7 @@ export interface QuickOpenMain {
 export interface WorkspaceMain {
     $pickWorkspaceFolder(options: WorkspaceFolderPickOptionsMain): Promise<theia.WorkspaceFolder | undefined>;
     $startFileSearch(includePattern: string, excludePatternOrDisregardExcludes: string | false,
-                     maxResults: number | undefined, token: theia.CancellationToken): PromiseLike<UriComponents[]>;
+        maxResults: number | undefined, token: theia.CancellationToken): PromiseLike<UriComponents[]>;
 
 }
 
@@ -334,7 +334,7 @@ export interface TreeViewsMain {
 
 export interface TreeViewsExt {
     $getChildren(treeViewId: string, treeItemId: string | undefined): Promise<TreeViewItem[] | undefined>;
-    $setExpanded(treeViewId: string, treeItemId: string): Promise<any>;
+    $setExpanded(treeViewId: string, treeItemId: string, expanded: boolean): Promise<any>;
     $setSelection(treeViewId: string, treeItemId: string): Promise<any>;
 }
 

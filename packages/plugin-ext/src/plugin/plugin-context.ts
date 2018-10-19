@@ -89,7 +89,7 @@ export function createAPIFactory(
     envExt: EnvExtImpl,
     preferenceRegistryExt: PreferenceRegistryExtImpl): PluginAPIFactory {
 
-    const commandRegistryExt = rpc.set(MAIN_RPC_CONTEXT.COMMAND_REGISTRY_EXT, new CommandRegistryImpl(rpc));
+    const commandRegistry = rpc.set(MAIN_RPC_CONTEXT.COMMAND_REGISTRY_EXT, new CommandRegistryImpl(rpc));
     const quickOpenExt = rpc.set(MAIN_RPC_CONTEXT.QUICK_OPEN_EXT, new QuickOpenExtImpl(rpc));
     const dialogsExt = new DialogsExtImpl(rpc);
     const messageRegistryExt = new MessageRegistryExt(rpc);
@@ -102,17 +102,17 @@ export function createAPIFactory(
     const terminalExt = rpc.set(MAIN_RPC_CONTEXT.TERMINAL_EXT, new TerminalServiceExtImpl(rpc));
     const outputChannelRegistryExt = new OutputChannelRegistryExt(rpc);
     const languagesExt = rpc.set(MAIN_RPC_CONTEXT.LANGUAGES_EXT, new LanguagesExtImpl(rpc, documents));
-    const treeViewsExt = rpc.set(MAIN_RPC_CONTEXT.TREE_VIEWS_EXT, new TreeViewsExtImpl(rpc));
+    const treeViewsExt = rpc.set(MAIN_RPC_CONTEXT.TREE_VIEWS_EXT, new TreeViewsExtImpl(rpc, commandRegistry));
 
     return function (plugin: InternalPlugin): typeof theia {
         const commands: typeof theia.commands = {
             // tslint:disable-next-line:no-any
             registerCommand(command: theia.Command, handler?: <T>(...args: any[]) => T | Thenable<T>): Disposable {
-                return commandRegistryExt.registerCommand(command, handler);
+                return commandRegistry.registerCommand(command, handler);
             },
             // tslint:disable-next-line:no-any
             executeCommand<T>(commandId: string, ...args: any[]): PromiseLike<T | undefined> {
-                return commandRegistryExt.executeCommand<T>(commandId, args);
+                return commandRegistry.executeCommand<T>(commandId, args);
             },
             // tslint:disable-next-line:no-any
             registerTextEditorCommand(command: theia.Command, callback: (textEditor: theia.TextEditor, edit: theia.TextEditorEdit, ...arg: any[]) => void): Disposable {
@@ -120,7 +120,7 @@ export function createAPIFactory(
             },
             // tslint:disable-next-line:no-any
             registerHandler(commandId: string, handler: (...args: any[]) => any): Disposable {
-                return commandRegistryExt.registerHandler(commandId, handler);
+                return commandRegistry.registerHandler(commandId, handler);
             }
         };
 

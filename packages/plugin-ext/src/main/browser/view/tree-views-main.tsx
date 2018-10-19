@@ -69,6 +69,8 @@ export class TreeViewsMainImpl implements TreeViewsMain {
         this.treeViewWidgets.set(treeViewId, treeViewWidget);
 
         this.viewRegistry.onRegisterTreeView(treeViewId, treeViewWidget);
+
+        this.handleTreeEvents(treeViewId, treeViewWidget);
     }
 
     $refresh(treeViewId: string): void {
@@ -94,6 +96,18 @@ export class TreeViewsMainImpl implements TreeViewsMain {
         child.bind(TreeViewWidget).toSelf();
 
         return child;
+    }
+
+    handleTreeEvents(treeViewId: string, treeViewWidget: TreeViewWidget) {
+        treeViewWidget.model.onExpansionChanged(event => {
+            this.proxy.$setExpanded(treeViewId, event.id, event.expanded);
+        });
+
+        treeViewWidget.model.onSelectionChanged(event => {
+            if (event.length === 1) {
+                this.proxy.$setSelection(treeViewId, event[0].id);
+            }
+        });
     }
 
 }
@@ -230,7 +244,7 @@ export class PluginTree extends TreeImpl {
     }
 
     protected async resolveChildren(parent: CompositeTreeNode): Promise<TreeNode[]> {
-        return await this.dataProvider.resolveChildren(parent.id);
+        return this.dataProvider.resolveChildren(parent.id);
     }
 
 }

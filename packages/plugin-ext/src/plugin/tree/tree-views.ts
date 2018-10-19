@@ -19,6 +19,7 @@ import { Emitter } from '@theia/core/lib/common/event';
 import { Disposable } from '../types-impl';
 import { PLUGIN_RPC_CONTEXT, TreeViewsExt, TreeViewsMain, TreeViewItem } from '../../api/plugin-api';
 import { RPCProtocol } from '../../api/rpc-protocol';
+import { CommandRegistryImpl } from '../command-registry';
 
 export class TreeViewsExtImpl implements TreeViewsExt {
 
@@ -26,7 +27,7 @@ export class TreeViewsExtImpl implements TreeViewsExt {
 
     private treeViews: Map<string, TreeViewExtImpl<any>> = new Map<string, TreeViewExtImpl<any>>();
 
-    constructor(rpc: RPCProtocol) {
+    constructor(rpc: RPCProtocol, private commandRegistry: CommandRegistryImpl) {
         this.proxy = rpc.getProxy(PLUGIN_RPC_CONTEXT.TREE_VIEWS_MAIN);
     }
 
@@ -44,7 +45,7 @@ export class TreeViewsExtImpl implements TreeViewsExt {
             throw new Error('Options with treeDataProvider is mandatory');
         }
 
-        const treeView = new TreeViewExtImpl(treeViewId, options.treeDataProvider, this.proxy);
+        const treeView = new TreeViewExtImpl(treeViewId, options.treeDataProvider, this.proxy, this.commandRegistry);
         this.treeViews.set(treeViewId, treeView);
 
         return {
@@ -71,8 +72,6 @@ export class TreeViewsExtImpl implements TreeViewsExt {
     }
 
     async $getChildren(treeViewId: string, treeItemId: string): Promise<TreeViewItem[] | undefined> {
-        console.log('PLUGIN: $getChildren > treeViewId[ ' + treeViewId + ' ] treeItemId[ ' + treeItemId + ' ]');
-
         const treeView = this.treeViews.get(treeViewId);
         if (!treeView) {
             throw new Error('No tree view with id' + treeViewId);
@@ -81,22 +80,26 @@ export class TreeViewsExtImpl implements TreeViewsExt {
         return treeView.getChildren(treeItemId);
     }
 
-    async $setExpanded(treeViewId: string, treeItemId: string): Promise<any> {
-        console.log('PLUGIN: $setExpanded > treeViewId[ ' + treeViewId + ' ] treeItemId[ ' + treeItemId + ' ]');
-
+    async $setExpanded(treeViewId: string, treeItemId: string, expanded: boolean): Promise<any> {
         const treeView = this.treeViews.get(treeViewId);
         if (!treeView) {
             throw new Error('No tree view with id' + treeViewId);
+        }
+
+        if (expanded) {
+            return treeView.onExpanded(treeItemId);
+        } else {
+            return treeView.onCollapsed(treeItemId);
         }
     }
 
     async $setSelection(treeViewId: string, treeItemId: string): Promise<any> {
-        console.log('PLUGIN: $setSelection > treeViewId[ ' + treeViewId + ' ] treeItemId[ ' + treeItemId + ' ]');
-
         const treeView = this.treeViews.get(treeViewId);
         if (!treeView) {
             throw new Error('No tree view with id' + treeViewId);
         }
+
+        treeView.onSelectionChanged(treeItemId);
     }
 
 }
@@ -114,7 +117,11 @@ class TreeViewExtImpl<T> extends Disposable {
 
     private cache: Map<string, T> = new Map<string, T>();
 
-    constructor(treeViewId: string, private treeDataProvider: TreeDataProvider<T>, proxy: TreeViewsMain) {
+    constructor(treeViewId: string,
+        private treeDataProvider: TreeDataProvider<T>,
+        proxy: TreeViewsMain,
+        private commandRegistry: CommandRegistryImpl) {
+
         super(() => {
             this.dispose();
         });
@@ -151,9 +158,9 @@ class TreeViewExtImpl<T> extends Disposable {
         return 'item-' + this.idCounter;
     }
 
-    async getChildren(itemId: string): Promise<TreeViewItem[] | undefined> {
+    async getChildren(treeItemId: string): Promise<TreeViewItem[] | undefined> {
         // get element from a cache
-        const cachedElement: T | undefined = this.cache.get(itemId);
+        const cachedElement: T | undefined = this.cache.get(treeItemId);
 
         // ask data provider for children for cached element
         const result = await this.treeDataProvider.getChildren(cachedElement);
@@ -214,6 +221,46 @@ class TreeViewExtImpl<T> extends Disposable {
             return treeItems;
         } else {
             return undefined;
+        }
+    }
+
+    async onExpanded(treeItemId: string): Promise<any> {
+        // get element from a cache
+        const cachedElement: T | undefined = this.cache.get(treeItemId);
+
+        // fire an event
+        if (cachedElement) {
+            this.onDidExpandElementEmmiter.fire({
+                element: cachedElement
+            });
+        }
+    }
+
+    async onCollapsed(treeItemId: string): Promise<any> {
+        // get element from a cache
+        const cachedElement: T | undefined = this.cache.get(treeItemId);
+
+        // fire an event
+        if (cachedElement) {
+            this.onDidCollapseElementEmmiter.fire({
+                element: cachedElement
+            });
+        }
+    }
+
+    async onSelectionChanged(treeItemId: string): Promise<any> {
+        // get element from a cache
+        const cachedElement: T | undefined = this.cache.get(treeItemId);
+
+        if (cachedElement) {
+            this.selection = [cachedElement];
+
+            // Ask data provider for a tree item for the value
+            const treeItem = await this.treeDataProvider.getTreeItem(cachedElement);
+
+            if (treeItem.command) {
+                this.commandRegistry.executeCommand(treeItem.command.id, treeItem.command.arguments);
+            }
         }
     }
 
