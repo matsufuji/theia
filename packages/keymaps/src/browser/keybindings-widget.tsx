@@ -275,6 +275,7 @@ export class KeybindingWidget extends ReactWidget {
         const rawCommand = this.getRawValue(item.command);
         const rawId = this.getRawValue(item.id);
         const rawKeybinding = (item.keybinding) ? this.getRawValue(item.keybinding) : '';
+        const rawContext = (item.context) ? this.getRawValue(item.context) : '';
         const dialog = new SingleTextInputDialog({
             title: `Edit Keybinding For ${rawCommand}`,
             initialValue: rawKeybinding,
@@ -282,7 +283,7 @@ export class KeybindingWidget extends ReactWidget {
         });
         dialog.open().then(async keybinding => {
             if (keybinding) {
-                await this.keymapsService.setKeybinding(rawId, keybinding);
+                await this.keymapsService.setKeybinding(rawId, keybinding, rawContext);
             }
         });
     }

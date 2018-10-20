@@ -26,6 +26,7 @@ import { Emitter } from '@theia/core/lib/common/';
 export interface KeybindingJson {
     command: string,
     keybinding: string,
+    context: string,
 }
 
 @injectable()
@@ -79,7 +80,7 @@ export class KeymapsService {
         open(this.opener, this.resource.uri);
     }
 
-    async setKeybinding(command: string, keybinding: string): Promise<void> {
+    async setKeybinding(command: string, keybinding: string, context: string): Promise<void> {
         if (!this.resource.saveContents) {
             return;
         }
@@ -93,7 +94,7 @@ export class KeymapsService {
             }
         }
         if (!updated) {
-            const item: KeybindingJson = { 'command': command, 'keybinding': keybinding };
+            const item: KeybindingJson = { 'command': command, 'keybinding': keybinding, 'context': context  };
             keybindings.push(item);
         }
         await this.resource.saveContents(JSON.stringify(keybindings, undefined, 4));
